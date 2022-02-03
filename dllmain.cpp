@@ -222,7 +222,7 @@ void DelayedStart()
 	// Fix audio thread issues
 	if (FixAudioThreadDeadlock)
 	{
-		InstallCreateThreadHooks();
+		AudioDeadlockFix();
 	}
 
 	// Hook CreateFile API when using UseCustomModFolder

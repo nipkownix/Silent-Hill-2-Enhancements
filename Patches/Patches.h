@@ -71,6 +71,7 @@ void SetRoom312Resolution(void *WidthAddress);
 void UnhookWindowHandle();
 void ValidateBinary();
 
+void AudioDeadlockFix();
 void Patch2TBHardDrive();
 void PatchBestGraphics();
 void PatchBinary();
@@ -145,6 +146,7 @@ extern SH2VERSION GameVersion;
 extern bool IsInFullscreenImage;
 extern bool IsInBloomEffect;
 extern bool IsInFakeFadeout;
+extern bool CaptureThreads;
 extern DWORD *RoomIDAddr;
 extern DWORD *CutsceneIDAddr;
 extern float *CutscenePosAddr;

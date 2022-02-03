@@ -62,5 +62,8 @@ template<typename T, typename D>
 T UpdateModPath(T sh2, D str);
 
 void InstallCreateThreadHooks();
+void InstallSetThreadPriorityHooks();
+void InstallSetThreadPriorityBoostHooks();
+void InstallResumeThreadHooks();
 void InstallCreateProcessHooks();
 void InstallFileSystemHooks(HMODULE hModule);

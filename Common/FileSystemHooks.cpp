@@ -38,6 +38,9 @@ typedef BOOL(WINAPI *PFN_CreateProcessA)(LPCSTR lpApplicationName, LPSTR lpComma
 typedef BOOL(WINAPI *PFN_CreateProcessW)(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags,
 	LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation);
 typedef HANDLE(WINAPI *PFN_CreateThread)(LPSECURITY_ATTRIBUTES lpThreadAttributes, SIZE_T dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, LPVOID lpParameter, DWORD dwCreationFlags, LPDWORD lpThreadId);
+typedef DWORD(WINAPI* PFN_SetThreadPriority)(HANDLE hThread, int nPriority);
+typedef DWORD(WINAPI* PFN_SetThreadPriorityBoost)(HANDLE hThread, BOOL bDisablePriorityBoost);
+typedef DWORD(WINAPI* PFN_ResumeThread)(HANDLE hThread);
 
 // Proc addresses
 FARPROC p_GetModuleFileNameA = nullptr;
@@ -51,6 +54,9 @@ FARPROC p_GetPrivateProfileStringW = nullptr;
 FARPROC p_CreateProcessA = nullptr;
 FARPROC p_CreateProcessW = nullptr;
 FARPROC p_CreateThread = nullptr;
+FARPROC p_SetThreadPriority = nullptr;
+FARPROC p_SetThreadPriorityBoost = nullptr;
+FARPROC p_ResumeThread = nullptr;
 
 // Variable used in hooked modules
 bool IsFileSystemHooking = false;
@@ -680,33 +686,79 @@ BOOL WINAPI CreateProcessWHandler(LPCWSTR lpApplicationName, LPWSTR lpCommandLin
 		lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation);
 }
 
+/////
+
+int ThreadCounter;
+bool ADXThreadsRunning;
+HANDLE ADXThread1;
+HANDLE ADXThread2;
+HANDLE ADXThread3;
+
+static PFN_CreateThread org_CreateThread;
+static PFN_SetThreadPriority org_SetThreadPriority;
+static PFN_SetThreadPriorityBoost org_SetThreadPriorityBoost;
+static PFN_ResumeThread org_ResumeThread;
+
 HANDLE WINAPI CreateThreadHandler(LPSECURITY_ATTRIBUTES lpThreadAttributes, SIZE_T dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, LPVOID lpParameter, DWORD dwCreationFlags, LPDWORD lpThreadId)
 {
-	static PFN_CreateThread org_CreateThread = (PFN_CreateThread)InterlockedCompareExchangePointer((PVOID*)&p_CreateThread, nullptr, nullptr);
-
 	if (!org_CreateThread)
 	{
 		Logging::Log() << __FUNCTION__ << " Error: invalid proc address!";
 		return nullptr;
 	}
 
-	HANDLE hThread = org_CreateThread(lpThreadAttributes, dwStackSize, lpStartAddress, lpParameter, dwCreationFlags, lpThreadId);
+	HANDLE hThread;
 
-	if (hThread)
+	if (CaptureThreads == true)
 	{
-		HMODULE hModule = nullptr;
-		GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCTSTR)lpStartAddress, &hModule);
+		hThread = org_CreateThread(lpThreadAttributes, 0x100000, lpStartAddress, lpParameter, dwCreationFlags, lpThreadId);
 
-		wchar_t dllPath[MAX_PATH] = { };
-		GetModuleFileName(hModule, dllPath, MAX_PATH);
-
-		wchar_t *name = wcsrchr(dllPath, '\\');
-		name = name ? name + 1 : dllPath;
-
-		if ((DWORD)hModule == 0x00400000 || _wcsicmp(name, L"dsound.dll") == 0)
+		if (hThread != nullptr && dwCreationFlags == 4)
 		{
-			SetThreadAffinityMask(hThread, GetProcessMask());
+			if (ThreadCounter == 0)
+			{
+				ADXThread1 = hThread;
+				DWORD_PTR SetMask = SetThreadAffinityMask(hThread, 1);
+				BOOL SetPrio = org_SetThreadPriority(hThread, THREAD_PRIORITY_ABOVE_NORMAL);
+				BOOL SetPrioBoost = org_SetThreadPriorityBoost(hThread, 1);
+
+				Logging::Log() << "AudioDeadlockFix: " << "CreateThread --> " << ThreadCounter << " --> SetPriority--> " << SetPrio << " --> SetPriorityBoost--> " << SetPrioBoost << " --> SetAffinityMask--> " << SetMask;
+
+			}
+			else if (ThreadCounter == 1)
+			{
+				ADXThread2 = hThread;
+				DWORD_PTR SetMask = SetThreadAffinityMask(hThread, 1);
+				BOOL SetPrio = org_SetThreadPriority(hThread, THREAD_PRIORITY_ABOVE_NORMAL);
+				BOOL SetPrioBoost = org_SetThreadPriorityBoost(hThread, 1);
+
+				Logging::Log() << "AudioDeadlockFix: " << "CreateThread --> " << ThreadCounter << " --> SetPriority--> " << SetPrio << " --> SetPriorityBoost--> " << SetPrioBoost << " --> SetAffinityMask--> " << SetMask;
+			}
+			else if (ThreadCounter == 2)
+			{
+				ADXThread3 = hThread;
+				DWORD_PTR SetMask = SetThreadAffinityMask(hThread, 1);
+				BOOL SetPrio = org_SetThreadPriority(hThread, THREAD_PRIORITY_LOWEST);
+				BOOL SetPrioBoost = org_SetThreadPriorityBoost(hThread, 1);
+
+				Logging::Log() << "AudioDeadlockFix: " << "CreateThread --> " << ThreadCounter << " --> SetPriority--> " << SetPrio << " --> SetPriorityBoost--> " << SetPrioBoost << " --> SetAffinityMask--> " << SetMask;
+
+				HANDLE CurrentThread = GetCurrentThread();
+				DWORD_PTR SetMaskCurrentThread = SetThreadAffinityMask(CurrentThread, 1);
+				BOOL SetPrioBoostCurrentThread = org_SetThreadPriorityBoost(CurrentThread, 1);
+
+				Logging::Log() << "AudioDeadlockFix: " << "CreateThread --> " << ThreadCounter << " --> SetPriorityBoost--> " << SetPrioBoostCurrentThread << " --> SetAffinityMask--> " << SetMaskCurrentThread;
+			}
+
+			if (ThreadCounter != 2)
+				ThreadCounter++;
+			else
+				ThreadCounter = 0;
 		}
+	}
+	else
+	{
+		hThread = org_CreateThread(lpThreadAttributes, dwStackSize, lpStartAddress, lpParameter, dwCreationFlags, lpThreadId);
 	}
 
 	return hThread;
@@ -720,6 +772,107 @@ void InstallCreateThreadHooks()
 	// Hook CreateThread APIs
 	HMODULE h_kernel32 = GetModuleHandle(L"kernel32.dll");
 	InterlockedExchangePointer((PVOID*)&p_CreateThread, Hook::HotPatch(Hook::GetProcAddress(h_kernel32, "CreateThread"), "CreateThread", CreateThreadHandler));
+
+	org_CreateThread = (PFN_CreateThread)InterlockedCompareExchangePointer((PVOID*)&p_CreateThread, nullptr, nullptr);
+}
+
+
+BOOL WINAPI SetThreadPriorityHandler(HANDLE hThread, int nPriority)
+{
+	if (!org_SetThreadPriority)
+	{
+		Logging::Log() << __FUNCTION__ << " Error: invalid proc address!";
+		return false;
+	}
+
+	if (CaptureThreads == true)
+	{
+		if (hThread == ADXThread1 || hThread == ADXThread2)
+			return true;
+
+		if (hThread == ADXThread3)
+		{
+			ADXThreadsRunning = true;
+			org_ResumeThread(ADXThread2);
+			org_ResumeThread(ADXThread1);
+			org_ResumeThread(ADXThread3);
+			return true;
+		}
+	}
+
+	return org_SetThreadPriority(hThread, nPriority);
+}
+
+
+void InstallSetThreadPriorityHooks()
+{
+	// Logging
+	Logging::Log() << "Hooking the SetThreadPriority APIs...";
+
+	// Hook CreateThread APIs
+	HMODULE h_kernel32 = GetModuleHandle(L"kernel32.dll");
+	InterlockedExchangePointer((PVOID*)&p_SetThreadPriority, Hook::HotPatch(Hook::GetProcAddress(h_kernel32, "SetThreadPriority"), "SetThreadPriority", SetThreadPriorityHandler));
+	org_SetThreadPriority = (PFN_SetThreadPriority)InterlockedCompareExchangePointer((PVOID*)&p_SetThreadPriority, nullptr, nullptr);
+}
+
+BOOL WINAPI SetThreadPriorityBoostHandler(HANDLE hThread, BOOL bDisablePriorityBoost)
+{
+	if (!org_SetThreadPriorityBoost)
+	{
+		Logging::Log() << __FUNCTION__ << " Error: invalid proc address!";
+		return false;
+	}
+
+	if (CaptureThreads == true)
+	{
+		if (hThread == ADXThread1 || hThread == ADXThread2 || hThread == ADXThread3)
+		{
+			return true;
+		}
+	}
+
+	return org_SetThreadPriorityBoost(hThread, bDisablePriorityBoost);
+}
+
+void InstallSetThreadPriorityBoostHooks()
+{
+	// Logging
+	Logging::Log() << "Hooking the SetThreadPriorityBoost APIs...";
+
+	// Hook CreateThread APIs
+	HMODULE h_kernel32 = GetModuleHandle(L"kernel32.dll");
+	InterlockedExchangePointer((PVOID*)&p_SetThreadPriorityBoost, Hook::HotPatch(Hook::GetProcAddress(h_kernel32, "SetThreadPriorityBoost"), "SetThreadPriorityBoost", SetThreadPriorityBoostHandler));
+	org_SetThreadPriorityBoost = (PFN_SetThreadPriorityBoost)InterlockedCompareExchangePointer((PVOID*)&p_SetThreadPriorityBoost, nullptr, nullptr);
+}
+
+DWORD WINAPI ResumeThreadHandler(HANDLE hThread)
+{
+	if (!org_ResumeThread)
+	{
+		Logging::Log() << __FUNCTION__ << " Error: invalid proc address!";
+		return false;
+	}
+
+	if (CaptureThreads == true)
+	{
+		if (hThread == ADXThread1 || hThread == ADXThread2 || hThread == ADXThread3)
+		{
+			return 1;
+		}
+	}
+
+	return org_ResumeThread(hThread);
+}
+
+void InstallResumeThreadHooks()
+{
+	// Logging
+	Logging::Log() << "Hooking the ResumeThread APIs...";
+
+	// Hook CreateThread APIs
+	HMODULE h_kernel32 = GetModuleHandle(L"kernel32.dll");
+	InterlockedExchangePointer((PVOID*)&p_ResumeThread, Hook::HotPatch(Hook::GetProcAddress(h_kernel32, "ResumeThread"), "ResumeThread", ResumeThreadHandler));
+	org_ResumeThread = (PFN_ResumeThread)InterlockedCompareExchangePointer((PVOID*)&p_ResumeThread, nullptr, nullptr);
 }
 
 void InstallCreateProcessHooks()
