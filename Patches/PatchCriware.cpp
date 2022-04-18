@@ -2,7 +2,6 @@
 #include "Criware\criware.h"
 #include "Logging\Logging.h"
 #include "External/Hooking.Patterns/Hooking.Patterns.h"
-#include "External/injector/include/injector/injector.hpp"
 #include "Common/Utils.h"
 
 void PatchCriware()
@@ -19,7 +18,7 @@ void PatchCriware()
 	WriteJMPtoMemory((BYTE*)pattern.count(1).get(0).get<uint32_t*>(9968), ADXF_GetPtStat, 6);
 
 	WriteCalltoMemory((BYTE*)pattern.count(1).get(0).get<uint32_t*>(14528), ADXWIN_SetupDvdFs, 5);
-	WriteJMPtoMemory((BYTE*)pattern.count(1).get(0).get<uint32_t*>(14656), ADXWIN_ShutdownDvdFs, 5);
+	WriteJMPtoMemory((BYTE*)pattern.count(1).get(0).get<uint32_t*>(14656), ADXWIN_ShutdownDvdFs, 6);
 	WriteJMPtoMemory((BYTE*)pattern.count(1).get(0).get<uint32_t*>(14704), ADXWIN_SetupSound, 6);
 
 	WriteJMPtoMemory((BYTE*)pattern.count(1).get(0).get<uint32_t*>(14800), ADXFIC_Create, 6);
