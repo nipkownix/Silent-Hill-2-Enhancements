@@ -80,6 +80,7 @@ void PatchBinary();
 void PatchCDCheck();
 void PatchCatacombsMeatRoom();
 void PatchCreatureVehicleSpawn();
+void PatchCriware();
 HRESULT PatchCustomExeStr();
 void PatchCustomFog();
 void PatchCustomFonts();
