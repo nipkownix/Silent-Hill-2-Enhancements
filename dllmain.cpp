@@ -224,13 +224,11 @@ void DelayedStart()
 		HookDirectInput8Create();
 	}
 
-	// Fix audio thread issues
-	//if (FixAudioThreadDeadlock)
-	//{
-	//	InstallCreateThreadHooks();
-	//}
-
-	PatchCriware();
+	// Fix audio issues
+	if (EnableCriWareReimplementation)
+	{
+		PatchCriware();
+	}
 
 	// Hook CreateFile API when using UseCustomModFolder
 	if (UseCustomModFolder)

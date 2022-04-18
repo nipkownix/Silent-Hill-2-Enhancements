@@ -24,6 +24,7 @@
 	visit(DPadMovementFix, true) \
 	visit(DynamicResolution, true) \
 	visit(EnableScreenshots, true) \
+	visit(EnableCriWareReimplementation, true) \
 	visit(EnableSFXAddrHack, true) \
 	visit(EnableSMAA, false) \
 	visit(EnableSoftShadows, true) \
@@ -32,7 +33,6 @@
 	visit(Fix2D, true) \
 	visit(FixAdvancedOptions, true) \
 	visit(FixAptClockFlashlight, true) \
-	visit(FixAudioThreadDeadlock, true) \
 	visit(FixChainsawSpawn, true) \
 	visit(FixCreatureVehicleSpawn, true) \
 	visit(FixDrawingTextLine, true) \
